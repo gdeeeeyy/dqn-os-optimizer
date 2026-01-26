@@ -1,0 +1,18 @@
+monitoring:
+  metrics_sources:
+    - /proc/stat
+    - /proc/loadavg
+    - /proc/meminfo
+
+  export_formats:
+    - csv
+    - json
+
+  retention:
+    metrics_days: 7
+    logs_days: 30
+
+  alerts:
+    cpu_threshold: 95
+    load_threshold: 10.0
+    context_switch_threshold: 50000

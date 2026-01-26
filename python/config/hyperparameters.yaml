@@ -1,0 +1,30 @@
+# DQN Hyperparameters
+model:
+  state_dim: 6
+  action_dim: 5
+  hidden_dim: 128
+
+training:
+  learning_rate: 0.001
+  gamma: 0.99
+  batch_size: 64
+  memory_size: 10000
+  target_update_freq: 100
+  training_start: 1000
+
+exploration:
+  epsilon_start: 1.0
+  epsilon_end: 0.01
+  epsilon_decay: 0.995
+
+monitoring:
+  metrics_interval: 1.0 # seconds
+  log_interval: 10
+  save_interval: 100
+
+rewards:
+  cpu_weight: 2.0
+  stability_weight: 3.0
+  context_switch_weight: 1.0
+  blocked_tasks_weight: 1.0
+  load_weight: 0.5
