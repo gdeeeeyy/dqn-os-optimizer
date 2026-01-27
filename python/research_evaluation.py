@@ -12,6 +12,7 @@ from scipy import stats
 from typing import Dict, List, Tuple
 import json
 from pathlib import Path
+import os
 
 
 class ResearchEvaluator:
