@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "Cleaning up temporary files..."
+echo "Cleaning temporary files..."
 
 rm -f /tmp/scheduler_*.{csv,log,json}
 rm -f /tmp/rl_*.json

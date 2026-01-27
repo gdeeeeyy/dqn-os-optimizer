@@ -3,36 +3,24 @@ venv/
 __pycache__/
 *.pyc
 *.pyo
-*.pyd
-.Python
-*.so
-*.egg
 *.egg-info/
-dist/
-build/
 
 # Rust
 rust/target/
 rust/Cargo.lock
 
-# Data and results
+# Data
 data/
 results/
+checkpoints/
 *.csv
 *.log
 *.json
-/tmp/
 
 # Models
 *.pth
-*.pt
 
 # IDE
 .vscode/
 .idea/
 *.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db

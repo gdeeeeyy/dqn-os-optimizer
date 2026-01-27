@@ -2,16 +2,14 @@
 
 echo "Stopping CPU Scheduler Optimizer..."
 
-if command -v tmux &> /dev/null; then
-    tmux kill-session -t scheduler 2>/dev/null || true
-    echo "✓ Tmux session stopped"
-fi
+tmux kill-session -t scheduler 2>/dev/null || true
+sudo pkill -f cpu_scheduler_optimizer 2>/dev/null
+pkill -f advanced_dqn_agent.py 2>/dev/null
+pkill -f realtime_monitor.py 2>/dev/null
 
 if [ -f .pids ]; then
-    read -r RUST_PID AGENT_PID WEB_PID < .pids
-    kill $RUST_PID $AGENT_PID $WEB_PID 2>/dev/null || true
-    rm .pids
-    echo "✓ Background processes stopped"
+  xargs sudo kill -9 < .pids
+  rm .pids
 fi
 
 echo "✅ System stopped"

@@ -1,25 +1,18 @@
 scheduler:
-  baseline_duration: 60 # seconds
-  optimization_duration: 240 # seconds
-  metrics_interval: 1.0 # seconds
+  baseline_duration: 60
+  optimization_duration: 300
+  metrics_interval: 1.0
 
 actions:
   enabled:
     - set_nice
     - set_scheduler
-    - adjust_cgroup
-
+  
   nice_values:
     high_priority: -5
     normal_priority: 0
     low_priority: 10
 
-  scheduler_policies:
-    - SCHED_OTHER
-    - SCHED_BATCH
-    - SCHED_IDLE
-
 safety:
   max_actions_per_minute: 30
-  min_action_interval: 2.0 # seconds
-  emergency_rollback: true
+  min_action_interval: 2.0
