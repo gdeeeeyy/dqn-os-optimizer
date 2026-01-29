@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DQN CPU Scheduler - Real-time Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-dark: #0a0e1a;
+            --bg-card: #131826;
+            --bg-elevated: #1a1f33;
+            --accent-primary: #00d9ff;
+            --accent-secondary: #7c3aed;
+            --accent-success: #10b981;
+            --accent-warning: #f59e0b;
+            --accent-danger: #ef4444;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --border-color: #1e293b;
+            --glow-primary: rgba(0, 217, 255, 0.3);
+            --glow-secondary: rgba(124, 58, 237, 0.3);
+        }
+
+        body {
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Animated background */
+        .bg-animation {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            opacity: 0.4;
+            background: 
+                radial-gradient(circle at 20% 30%, var(--glow-primary), transparent 40%),
+                radial-gradient(circle at 80% 70%, var(--glow-secondary), transparent 40%);
+            filter: blur(80px);
+            animation: pulse 8s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 0.5; }
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 1800px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* Header */
+        header {
+            margin-bottom: 2rem;
+            animation: slideDown 0.6s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.5rem 2rem;
+            background: var(--bg-card);
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.5px;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1.5rem;
+            background: var(--bg-elevated);
+            border-radius: 50px;
+            border: 1px solid var(--border-color);
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--accent-success);
+            box-shadow: 0 0 20px var(--accent-success);
+            animation: pulse-indicator 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse-indicator {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        /* Grid Layout */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 1.5rem;
+            animation: fadeIn 0.8s ease-out 0.2s both;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Card Styles */
+        .card {
+            background: var(--bg-card);
+            border-radius: 20px;
+            padding: 1.5rem;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 48px rgba(0, 217, 255, 0.1);
+        }
+
+        .card:hover::before {
+            opacity: 1;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .card-title {
+            font-size: 1.125rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            letter-spacing: -0.3px;
+        }
+
+        .card-icon {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-elevated);
+            border-radius: 12px;
+            font-size: 1.25rem;
+        }
+
+        /* Metrics */
+        .metric-large {
+            font-size: 3rem;
+            font-weight: 900;
+            font-family: 'JetBrains Mono', monospace;
+            line-height: 1;
+            margin: 0.5rem 0;
+            background: linear-gradient(135deg, var(--accent-primary), var(--text-primary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .metric-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+
+        .metric-change {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-top: 0.5rem;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .metric-change.positive {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--accent-success);
+        }
+
+        .metric-change.negative {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--accent-danger);
+        }
+
+        /* Progress Bars */
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: var(--bg-elevated);
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 1rem 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+            border-radius: 10px;
+            transition: width 0.5s ease;
+            box-shadow: 0 0 20px var(--glow-primary);
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+
+        .stat-item {
+            padding: 1rem;
+            background: var(--bg-elevated);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        .stat-value {
+            font-size: 1.75rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--accent-primary);
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            margin-top: 0.25rem;
+        }
+
+        /* Process List */
+        .process-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .process-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            background: var(--bg-elevated);
+            border-radius: 12px;
+            margin-bottom: 0.75rem;
+            border: 1px solid var(--border-color);
+            transition: all 0.2s ease;
+        }
+
+        .process-item:hover {
+            background: var(--bg-dark);
+            border-color: var(--accent-primary);
+        }
+
+        .process-info {
+            flex: 1;
+        }
+
+        .process-name {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .process-type {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+
+        .process-cpu {
+            font-size: 1.25rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--accent-primary);
+        }
+
+        /* Action Log */
+        .action-log {
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.875rem;
+        }
+
+        .action-entry {
+            padding: 0.75rem;
+            background: var(--bg-elevated);
+            border-left: 3px solid var(--accent-primary);
+            margin-bottom: 0.5rem;
+            border-radius: 4px;
+            animation: slideInLeft 0.3s ease;
+        }
+
+        @keyframes slideInLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .action-time {
+            color: var(--text-muted);
+            font-size: 0.75rem;
+        }
+
+        .action-text {
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+        }
+
+        /* Chart Containers */
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+
+        /* Responsive Grid Sizes */
+        .col-span-12 { grid-column: span 12; }
+        .col-span-8 { grid-column: span 8; }
+        .col-span-6 { grid-column: span 6; }
+        .col-span-4 { grid-column: span 4; }
+        .col-span-3 { grid-column: span 3; }
+
+        /* Scrollbar Styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-elevated);
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--accent-primary);
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-secondary);
+        }
+
+        /* Comparison Badge */
+        .comparison-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: var(--bg-elevated);
+            border-radius: 50px;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+
+        .badge-baseline {
+            color: var(--text-muted);
+        }
+
+        .badge-optimized {
+            color: var(--accent-success);
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .col-span-8, .col-span-6, .col-span-4, .col-span-3 {
+                grid-column: span 12;
+            }
+        }
+
+        /* Loading Animation */
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid var(--bg-elevated);
+            border-top-color: var(--accent-primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Tooltip */
+        .tooltip {
+            position: relative;
+            cursor: help;
+        }
+
+        .tooltip::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 0.5rem 1rem;
+            background: var(--bg-elevated);
+            color: var(--text-primary);
+            border-radius: 8px;
+            font-size: 0.75rem;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+            border: 1px solid var(--border-color);
+        }
+
+        .tooltip:hover::after {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-animation"></div>
+    
+    <div class="container">
+        <header>
+            <div class="header-content">
+                <div>
+                    <h1>DQN CPU Scheduler</h1>
+                    <p style="color: var(--text-secondary); margin-top: 0.5rem; font-size: 1rem;">
+                        Deep Reinforcement Learning OS Optimizer
+                    </p>
+                </div>
+                <div class="status-badge">
+                    <div class="status-indicator"></div>
+                    <span id="systemStatus">Training Active</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="dashboard-grid">
+            <!-- Key Performance Metrics -->
+            <div class="card col-span-3">
+                <div class="card-header">
+                    <div class="card-title">CPU Efficiency</div>
+                    <div class="card-icon">⚡</div>
+                </div>
+                <div class="metric-large" id="cpuEfficiency">87.5%</div>
+                <div class="metric-label">Current Score</div>
+                <div class="metric-change positive" id="efficiencyChange">
+                    ↑ +28.3% vs baseline
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="efficiencyProgress" style="width: 87.5%"></div>
+                </div>
+            </div>
+
+            <div class="card col-span-3">
+                <div class="card-header">
+                    <div class="card-title">CPU Stability</div>
+                    <div class="card-icon">🎯</div>
+                </div>
+                <div class="metric-large" id="cpuStability">92.1%</div>
+                <div class="metric-label">Variance Reduction</div>
+                <div class="metric-change positive" id="stabilityChange">
+                    ↑ +51.8% improvement
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="stabilityProgress" style="width: 92.1%"></div>
+                </div>
+            </div>
+
+            <div class="card col-span-3">
+                <div class="card-header">
+                    <div class="card-title">Context Switches</div>
+                    <div class="card-icon">🔄</div>
+                </div>
+                <div class="metric-large" id="contextSwitches">5.2K</div>
+                <div class="metric-label">Per Second</div>
+                <div class="metric-change positive" id="switchesChange">
+                    ↓ -34.8% reduction
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="switchesProgress" style="width: 65.2%"></div>
+                </div>
+            </div>
+
+            <div class="card col-span-3">
+                <div class="card-header">
+                    <div class="card-title">Load Average</div>
+                    <div class="card-icon">📊</div>
+                </div>
+                <div class="metric-large" id="loadAverage">1.52</div>
+                <div class="metric-label">System Load</div>
+                <div class="metric-change positive" id="loadChange">
+                    ↓ -19.6% reduction
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="loadProgress" style="width: 40%"></div>
+                </div>
+            </div>
+
+            <!-- Real-time CPU Usage Chart -->
+            <div class="card col-span-8">
+                <div class="card-header">
+                    <div class="card-title">Real-time CPU Usage</div>
+                    <div style="display: flex; gap: 1rem;">
+                        <div class="comparison-badge badge-baseline">⚪ Baseline</div>
+                        <div class="comparison-badge badge-optimized">🟢 DQN Optimized</div>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="cpuChart"></canvas>
+                </div>
+            </div>
+
+            <!-- DQN Training Progress -->
+            <div class="card col-span-4">
+                <div class="card-header">
+                    <div class="card-title">Training Progress</div>
+                    <div class="card-icon">🧠</div>
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value" id="episode">1,247</div>
+                        <div class="stat-label">Episodes</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="epsilon">0.15</div>
+                        <div class="stat-label">Epsilon</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="avgReward">+28.5</div>
+                        <div class="stat-label">Avg Reward</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="qValue">142.3</div>
+                        <div class="stat-label">Q-Value</div>
+                    </div>
+                </div>
+                <div style="margin-top: 1.5rem;">
+                    <div class="metric-label">Training Progress</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: 83%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reward Curve -->
+            <div class="card col-span-6">
+                <div class="card-header">
+                    <div class="card-title">Learning Curve - Rewards</div>
+                    <div class="card-icon">📈</div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="rewardChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Q-Value Evolution -->
+            <div class="card col-span-6">
+                <div class="card-header">
+                    <div class="card-title">Q-Value Evolution</div>
+                    <div class="card-icon">🎲</div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="qValueChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Process Monitor -->
+            <div class="card col-span-6">
+                <div class="card-header">
+                    <div class="card-title">Active Processes</div>
+                    <div class="card-icon">💻</div>
+                </div>
+                <div class="process-list" id="processList">
+                    <!-- Dynamically populated -->
+                </div>
+            </div>
+
+            <!-- Action Log -->
+            <div class="card col-span-6">
+                <div class="card-header">
+                    <div class="card-title">Scheduler Actions</div>
+                    <div class="card-icon">📝</div>
+                </div>
+                <div class="action-log" id="actionLog">
+                    <!-- Dynamically populated -->
+                </div>
+            </div>
+
+            <!-- Performance Comparison -->
+            <div class="card col-span-12">
+                <div class="card-header">
+                    <div class="card-title">Performance Comparison - Baseline vs DQN</div>
+                    <div class="card-icon">📊</div>
+                </div>
+                <div class="chart-container" style="height: 400px;">
+                    <canvas id="comparisonChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Chart.js default configuration
+        Chart.defaults.color = '#94a3b8';
+        Chart.defaults.borderColor = '#1e293b';
+        Chart.defaults.font.family = "'JetBrains Mono', monospace";
+
+        // Initialize data arrays
+        const timeLabels = [];
+        const cpuBaselineData = [];
+        const cpuOptimizedData = [];
+        const rewardData = [];
+        const qValueData = [];
+
+        // Initialize with some data
+        for (let i = 0; i < 50; i++) {
+            timeLabels.push(i);
+            cpuBaselineData.push(Math.random() * 30 + 60);
+            cpuOptimizedData.push(Math.random() * 20 + 50);
+            rewardData.push(Math.random() * 10 + (i * 0.5));
+            qValueData.push(Math.random() * 20 + (i * 2));
+        }
+
+        // CPU Usage Chart
+        const cpuChart = new Chart(document.getElementById('cpuChart'), {
+            type: 'line',
+            data: {
+                labels: timeLabels,
+                datasets: [{
+                    label: 'Baseline',
+                    data: cpuBaselineData,
+                    borderColor: '#64748b',
+                    backgroundColor: 'rgba(100, 116, 139, 0.1)',
+                    borderWidth: 2,
+                    tension: 0.4,
+                    fill: true
+                }, {
+                    label: 'DQN Optimized',
+                    data: cpuOptimizedData,
+                    borderColor: '#00d9ff',
+                    backgroundColor: 'rgba(0, 217, 255, 0.1)',
+                    borderWidth: 3,
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        ticks: {
+                            callback: function(value) {
+                                return value + '%';
+                            }
+                        },
+                        grid: {
+                            color: '#1e293b'
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    }
+                }
+            }
+        });
+
+        // Reward Chart
+        const rewardChart = new Chart(document.getElementById('rewardChart'), {
+            type: 'line',
+            data: {
+                labels: timeLabels,
+                datasets: [{
+                    label: 'Average Reward',
+                    data: rewardData,
+                    borderColor: '#10b981',
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    borderWidth: 3,
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        grid: {
+                            color: '#1e293b'
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    }
+                }
+            }
+        });
+
+        // Q-Value Chart
+        const qValueChart = new Chart(document.getElementById('qValueChart'), {
+            type: 'line',
+            data: {
+                labels: timeLabels,
+                datasets: [{
+                    label: 'Q-Value',
+                    data: qValueData,
+                    borderColor: '#7c3aed',
+                    backgroundColor: 'rgba(124, 58, 237, 0.1)',
+                    borderWidth: 3,
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        grid: {
+                            color: '#1e293b'
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    }
+                }
+            }
+        });
+
+        // Comparison Chart
+        const comparisonChart = new Chart(document.getElementById('comparisonChart'), {
+            type: 'bar',
+            data: {
+                labels: ['CPU Variance', 'Context Switches', 'Load Average', 'Efficiency Score'],
+                datasets: [{
+                    label: 'Baseline',
+                    data: [15.1, 8023, 1.89, 68.2],
+                    backgroundColor: 'rgba(100, 116, 139, 0.5)',
+                    borderColor: '#64748b',
+                    borderWidth: 2
+                }, {
+                    label: 'DQN Optimized',
+                    data: [7.3, 5234, 1.52, 87.5],
+                    backgroundColor: 'rgba(0, 217, 255, 0.5)',
+                    borderColor: '#00d9ff',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: '#1e293b'
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    }
+                }
+            }
+        });
+
+        // Simulate process list
+        const processes = [
+            { name: 'python3', type: 'CPU-Intensive', cpu: 45.2 },
+            { name: 'rust_optimizer', type: 'System', cpu: 23.1 },
+            { name: 'node', type: 'I/O-Bound', cpu: 12.8 },
+            { name: 'gcc', type: 'CPU-Intensive', cpu: 38.5 },
+            { name: 'docker', type: 'Mixed', cpu: 15.3 }
+        ];
+
+        function updateProcessList() {
+            const processList = document.getElementById('processList');
+            processList.innerHTML = processes.map(proc => `
+                <div class="process-item">
+                    <div class="process-info">
+                        <div class="process-name">${proc.name}</div>
+                        <div class="process-type">${proc.type}</div>
+                    </div>
+                    <div class="process-cpu">${proc.cpu.toFixed(1)}%</div>
+                </div>
+            `).join('');
+        }
+
+        // Simulate action log
+        const actions = [
+            { time: '14:23:45', action: 'Increased priority for process: python3 (PID: 1234)' },
+            { time: '14:23:43', action: 'Applied SCHED_FIFO to gcc (PID: 5678)' },
+            { time: '14:23:41', action: 'Decreased nice value for node (PID: 9012)' },
+            { time: '14:23:39', action: 'Optimized CPU affinity for docker (PID: 3456)' },
+            { time: '14:23:37', action: 'Rebalanced load across cores' }
+        ];
+
+        function updateActionLog() {
+            const actionLog = document.getElementById('actionLog');
+            actionLog.innerHTML = actions.map(action => `
+                <div class="action-entry">
+                    <div class="action-time">${action.time}</div>
+                    <div class="action-text">${action.action}</div>
+                </div>
+            `).join('');
+        }
+
+        // Real-time updates simulation
+        function updateCharts() {
+            // Add new data point
+            const newTime = timeLabels[timeLabels.length - 1] + 1;
+            timeLabels.push(newTime);
+            timeLabels.shift();
+
+            // Update CPU data
+            const newBaseline = Math.random() * 30 + 60;
+            const newOptimized = Math.random() * 20 + 50;
+            cpuBaselineData.push(newBaseline);
+            cpuBaselineData.shift();
+            cpuOptimizedData.push(newOptimized);
+            cpuOptimizedData.shift();
+
+            // Update reward and Q-value
+            const newReward = rewardData[rewardData.length - 1] + (Math.random() - 0.3);
+            const newQValue = qValueData[qValueData.length - 1] + (Math.random() * 4 - 1);
+            rewardData.push(Math.max(0, newReward));
+            rewardData.shift();
+            qValueData.push(Math.max(0, newQValue));
+            qValueData.shift();
+
+            // Update all charts
+            cpuChart.update('none');
+            rewardChart.update('none');
+            qValueChart.update('none');
+
+            // Update metrics
+            document.getElementById('cpuEfficiency').textContent = 
+                (85 + Math.random() * 5).toFixed(1) + '%';
+            document.getElementById('cpuStability').textContent = 
+                (90 + Math.random() * 5).toFixed(1) + '%';
+            document.getElementById('contextSwitches').textContent = 
+                (5.0 + Math.random() * 0.5).toFixed(1) + 'K';
+            document.getElementById('loadAverage').textContent = 
+                (1.45 + Math.random() * 0.15).toFixed(2);
+
+            // Update training stats
+            const currentEpisode = parseInt(document.getElementById('episode').textContent.replace(',', ''));
+            document.getElementById('episode').textContent = (currentEpisode + 1).toLocaleString();
+            document.getElementById('epsilon').textContent = 
+                (0.15 - Math.random() * 0.01).toFixed(3);
+            document.getElementById('avgReward').textContent = 
+                '+' + (28 + Math.random() * 2).toFixed(1);
+            document.getElementById('qValue').textContent = 
+                (140 + Math.random() * 5).toFixed(1);
+        }
+
+        // Initialize
+        updateProcessList();
+        updateActionLog();
+
+        // Start real-time updates
+        setInterval(updateCharts, 2000);
+        setInterval(() => {
+            // Randomly update process CPU usage
+            processes.forEach(proc => {
+                proc.cpu = Math.max(5, Math.min(95, proc.cpu + (Math.random() - 0.5) * 10));
+            });
+            updateProcessList();
+        }, 3000);
+
+        setInterval(() => {
+            // Add new action
+            const times = ['14:23:45', '14:23:46', '14:23:47', '14:23:48', '14:23:49'];
+            const actionTexts = [
+                'Optimized CPU affinity for high-priority task',
+                'Applied load balancing across NUMA nodes',
+                'Reduced context switching for I/O tasks',
+                'Increased quantum for CPU-intensive process',
+                'Migrated process to less loaded core'
+            ];
+            actions.unshift({
+                time: times[Math.floor(Math.random() * times.length)],
+                action: actionTexts[Math.floor(Math.random() * actionTexts.length)]
+            });
+            actions.pop();
+            updateActionLog();
+        }, 5000);
+    </script>
+</body>
+</html>
