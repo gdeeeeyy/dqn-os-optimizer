@@ -1,15 +1,21 @@
 #!/usr/bin/env python3
 """
-Enhanced Terminal Dashboard for DQN CPU Scheduler
-Shows real-time improvements, process optimization, and training progress
-Run with: python3 enhanced_terminal_dashboard.py
+Optimized Enhanced Terminal Dashboard for DQN CPU Scheduler
+- Real-time ASCII graphs with live updates
+- Faster data processing  
+- Shows improvements immediately
+- Better visual feedback
+
+TIMING EXPECTATIONS:
+- 0-60s: Baseline data collection phase
+- 60s+: RL training starts, improvements visible after ~90-120s
+- Stable improvements: 3-5 minutes of training
 """
 
 import os
 import sys
 import time
 import json
-import pandas as pd
 from datetime import datetime
 from collections import deque
 import subprocess
@@ -21,12 +27,8 @@ try:
     from rich.panel import Panel
     from rich.table import Table
     from rich.live import Live
-    from rich.progress import Progress, BarColumn, TextColumn, SpinnerColumn
     from rich.text import Text
-    from rich.align import Align
     from rich import box
-    from rich.columns import Columns
-    from rich.syntax import Syntax
 except ImportError:
     print("Installing required package: rich")
     subprocess.check_call([sys.executable, "-m", "pip", "install", "rich", "--break-system-packages"])
@@ -35,347 +37,451 @@ except ImportError:
     from rich.panel import Panel
     from rich.table import Table
     from rich.live import Live
-    from rich.progress import Progress, BarColumn, TextColumn, SpinnerColumn
     from rich.text import Text
-    from rich.align import Align
     from rich import box
-    from rich.columns import Columns
 
 console = Console()
 
-class EnhancedDashboard:
+class OptimizedDashboard:
     def __init__(self):
         self.metrics_file = '/tmp/scheduler_metrics.csv'
         self.state_file = '/tmp/rl_state.json'
         self.action_file = '/tmp/scheduler_actions.log'
         
         # Data buffers
-        self.cpu_history = deque(maxlen=30)
-        self.reward_history = deque(maxlen=30)
-        self.process_stats = {}
+        self.cpu_baseline_history = deque(maxlen=50)
+        self.cpu_optimized_history = deque(maxlen=50)
+        self.reward_history = deque(maxlen=40)
         
-        # Baseline vs Optimized stats
-        self.baseline_avg = {'cpu': 0, 'switches': 0, 'load': 0}
-        self.optimized_avg = {'cpu': 0, 'switches': 0, 'load': 0}
+        # Statistics
+        self.baseline_stats = {'cpu': [], 'variance': [], 'switches': [], 'load': []}
+        self.optimized_stats = {'cpu': [], 'variance': [], 'switches': [], 'load': []}
         
         # Training state
         self.episode = 0
         self.epsilon = 1.0
-        self.avg_reward = 0
-        self.q_value = 0
+        self.avg_reward = 0.0
+        self.q_value = 0.0
         
-    def read_metrics(self):
-        """Read latest metrics from CSV"""
+        # Process tracking
+        self.processes = {}
+        self.actions = deque(maxlen=15)
+        
+        # Timing
+        self.start_time = time.time()
+        self.baseline_start = None
+        self.rl_start = None
+        
+    def read_metrics_fast(self):
+        """Fast CSV reading"""
         try:
             if not os.path.exists(self.metrics_file):
                 return None
             
-            df = pd.read_csv(self.metrics_file)
-            if len(df) == 0:
-                return None
+            with open(self.metrics_file, 'r') as f:
+                lines = f.readlines()
+                if len(lines) < 2:
+                    return None
                 
-            # Calculate baseline vs optimized averages
-            baseline_data = df[df['mode'] == 'baseline']
-            optimized_data = df[df['mode'] == 'rl']
+                header = lines[0].strip().split(',')
+                
+                # Parse last 100 lines
+                for line in lines[-100:]:
+                    parts = line.strip().split(',')
+                    if len(parts) < len(header):
+                        continue
+                    
+                    data = dict(zip(header, parts))
+                    
+                    try:
+                        mode = data.get('mode', '')
+                        cpu = float(data.get('cpu_usage', 0))
+                        variance = float(data.get('cpu_variance', 0))
+                        switches = float(data.get('context_switches', 0))
+                        load = float(data.get('load_avg', 0))
+                        
+                        if mode == 'baseline':
+                            if not self.baseline_start:
+                                self.baseline_start = time.time()
+                            self.baseline_stats['cpu'].append(cpu)
+                            self.baseline_stats['variance'].append(variance)
+                            self.baseline_stats['switches'].append(switches)
+                            self.baseline_stats['load'].append(load)
+                            self.cpu_baseline_history.append(cpu)
+                            
+                        elif mode == 'rl':
+                            if not self.rl_start:
+                                self.rl_start = time.time()
+                            self.optimized_stats['cpu'].append(cpu)
+                            self.optimized_stats['variance'].append(variance)
+                            self.optimized_stats['switches'].append(switches)
+                            self.optimized_stats['load'].append(load)
+                            self.cpu_optimized_history.append(cpu)
+                    except:
+                        continue
             
-            if len(baseline_data) > 0:
-                self.baseline_avg = {
-                    'cpu': baseline_data['cpu_usage'].mean(),
-                    'variance': baseline_data['cpu_variance'].mean(),
-                    'switches': baseline_data['context_switches'].mean(),
-                    'load': baseline_data['load_avg'].mean()
-                }
-            
-            if len(optimized_data) > 0:
-                self.optimized_avg = {
-                    'cpu': optimized_data['cpu_usage'].mean(),
-                    'variance': optimized_data['cpu_variance'].mean(),
-                    'switches': optimized_data['context_switches'].mean(),
-                    'load': optimized_data['load_avg'].mean()
-                }
-            
-            # Store CPU history
-            recent = df.tail(30)
-            for _, row in recent.iterrows():
-                self.cpu_history.append({
-                    'mode': row['mode'],
-                    'cpu': row['cpu_usage']
-                })
-            
-            return df.iloc[-1]
-            
-        except Exception as e:
+            return True
+        except:
             return None
     
-    def read_state(self):
-        """Read DQN training state"""
+    def read_state_fast(self):
+        """Fast JSON reading"""
         try:
             if not os.path.exists(self.state_file):
                 return None
             
             with open(self.state_file, 'r') as f:
                 state = json.load(f)
+                
                 self.episode = state.get('episode', 0)
                 self.epsilon = state.get('epsilon', 1.0)
-                self.avg_reward = state.get('avg_reward', 0)
-                self.q_value = state.get('avg_q_value', 0)
+                self.avg_reward = state.get('avg_reward', 0.0)
+                self.q_value = state.get('avg_q_value', 0.0)
+                
+                if self.avg_reward != 0:
+                    self.reward_history.append(self.avg_reward)
                 
                 # Process information
+                self.processes = {}
                 if 'processes' in state:
                     for proc in state['processes']:
-                        pid = proc.get('pid')
-                        if pid:
-                            self.process_stats[pid] = proc
-                
+                        if isinstance(proc, dict):
+                            pid = proc.get('pid')
+                            if pid:
+                                self.processes[pid] = {
+                                    'name': proc.get('name', 'unknown'),
+                                    'type': proc.get('type', 'unknown'),
+                                    'cpu': proc.get('cpu_usage', 0),
+                                    'nice': proc.get('nice', 0)
+                                }
                 return state
         except:
             return None
     
-    def read_actions(self):
-        """Read recent scheduler actions"""
+    def read_actions_fast(self):
+        """Fast action reading"""
         try:
             if not os.path.exists(self.action_file):
-                return []
+                return
             
             with open(self.action_file, 'r') as f:
-                lines = f.readlines()
-                return [line.strip() for line in lines[-10:]]  # Last 10 actions
+                for line in f.readlines()[-15:]:
+                    line = line.strip()
+                    if line and line not in self.actions:
+                        self.actions.append(line)
         except:
-            return []
+            pass
+    
+    def calc_improvement(self, baseline, optimized):
+        """Calculate improvement percentage"""
+        if not baseline or not optimized:
+            return 0.0
+        b_avg = sum(baseline) / len(baseline)
+        o_avg = sum(optimized) / len(optimized)
+        if b_avg == 0:
+            return 0.0
+        return ((b_avg - o_avg) / b_avg) * 100
     
     def create_header(self):
-        """Create dashboard header"""
+        """Dashboard header"""
+        runtime = int(time.time() - self.start_time)
+        
         title = Text()
         title.append("DQN CPU SCHEDULER ", style="bold cyan")
-        title.append("- Enhanced Terminal Dashboard", style="bold white")
+        title.append("- Enhanced Terminal Dashboard ", style="bold white")
         
-        status = Text()
-        status.append("● ", style="bold green")
-        status.append("TRAINING ACTIVE", style="bold green")
+        # Phase
+        if not self.baseline_start:
+            phase = Text("⏳ INITIALIZING", style="bold yellow")
+        elif not self.rl_start:
+            baseline_time = int(time.time() - self.baseline_start)
+            phase = Text(f"📊 BASELINE ({baseline_time}s/60s)", style="bold yellow")
+        else:
+            rl_time = int(time.time() - self.rl_start)
+            phase = Text(f"● TRAINING ({rl_time}s)", style="bold green")
         
         header_table = Table.grid(padding=1)
         header_table.add_column(justify="left")
         header_table.add_column(justify="right")
-        header_table.add_row(title, status)
+        header_table.add_row(title, phase)
         
-        return Panel(
-            header_table,
-            style="bold cyan",
-            border_style="bright_cyan",
-            box=box.DOUBLE
-        )
+        return Panel(header_table, style="bold cyan", border_style="bright_cyan", box=box.DOUBLE)
     
     def create_improvement_panel(self):
-        """Show improvement metrics"""
-        if self.baseline_avg['cpu'] == 0:
-            return Panel("[yellow]Collecting baseline data...[/yellow]", title="Improvements")
+        """Show improvements"""
+        if not self.baseline_stats['cpu'] or not self.optimized_stats['cpu']:
+            elapsed = int(time.time() - self.start_time)
+            
+            if not self.baseline_start:
+                msg = Text()
+                msg.append("⏳ Waiting for data...\n\n", style="yellow")
+                msg.append(f"Elapsed: {elapsed}s\n", style="dim")
+            elif not self.rl_start:
+                baseline_time = int(time.time() - self.baseline_start)
+                progress = min(100, int(baseline_time / 60 * 100))
+                bar = "█" * (progress // 5) + "░" * (20 - progress // 5)
+                
+                msg = Text()
+                msg.append("📊 Collecting baseline...\n\n", style="yellow")
+                msg.append(f"{bar} {progress}%\n\n", style="cyan")
+                msg.append(f"Time: {baseline_time}s / 60s\n", style="dim")
+                msg.append(f"Samples: {len(self.baseline_stats['cpu'])}", style="dim")
+            else:
+                msg = Text()
+                msg.append("⚙️  Training started...\n\n", style="yellow")
+                msg.append(f"Baseline: {len(self.baseline_stats['cpu'])}\n", style="dim")
+                msg.append(f"Optimized: {len(self.optimized_stats['cpu'])}\n", style="dim")
+                msg.append("\nImprovements show after ~30 samples", style="dim italic")
+            
+            return Panel(msg, title="[bold yellow]Status[/bold yellow]", border_style="yellow")
         
-        # Calculate improvements
-        cpu_improvement = ((self.baseline_avg['cpu'] - self.optimized_avg['cpu']) / self.baseline_avg['cpu'] * 100) if self.baseline_avg['cpu'] > 0 else 0
-        variance_improvement = ((self.baseline_avg['variance'] - self.optimized_avg['variance']) / self.baseline_avg['variance'] * 100) if self.baseline_avg['variance'] > 0 else 0
-        switches_improvement = ((self.baseline_avg['switches'] - self.optimized_avg['switches']) / self.baseline_avg['switches'] * 100) if self.baseline_avg['switches'] > 0 else 0
-        load_improvement = ((self.baseline_avg['load'] - self.optimized_avg['load']) / self.baseline_avg['load'] * 100) if self.baseline_avg['load'] > 0 else 0
+        # Calculate
+        cpu_imp = self.calc_improvement(self.baseline_stats['cpu'], self.optimized_stats['cpu'])
+        var_imp = self.calc_improvement(self.baseline_stats['variance'], self.optimized_stats['variance'])
+        switch_imp = self.calc_improvement(self.baseline_stats['switches'], self.optimized_stats['switches'])
+        load_imp = self.calc_improvement(self.baseline_stats['load'], self.optimized_stats['load'])
         
-        table = Table(show_header=True, header_style="bold magenta", box=box.ROUNDED)
-        table.add_column("Metric", style="cyan", width=20)
-        table.add_column("Baseline", justify="right", style="white")
-        table.add_column("Optimized", justify="right", style="green")
-        table.add_column("Improvement", justify="right", style="bold yellow")
+        # Averages
+        b_cpu = sum(self.baseline_stats['cpu']) / len(self.baseline_stats['cpu'])
+        o_cpu = sum(self.optimized_stats['cpu']) / len(self.optimized_stats['cpu'])
+        b_var = sum(self.baseline_stats['variance']) / len(self.baseline_stats['variance'])
+        o_var = sum(self.optimized_stats['variance']) / len(self.optimized_stats['variance'])
+        b_switch = sum(self.baseline_stats['switches']) / len(self.baseline_stats['switches'])
+        o_switch = sum(self.optimized_stats['switches']) / len(self.optimized_stats['switches'])
+        b_load = sum(self.baseline_stats['load']) / len(self.baseline_stats['load'])
+        o_load = sum(self.optimized_stats['load']) / len(self.optimized_stats['load'])
         
-        # CPU Usage
-        table.add_row(
-            "CPU Usage",
-            f"{self.baseline_avg['cpu']:.1f}%",
-            f"{self.optimized_avg['cpu']:.1f}%",
-            f"[green]↓ {cpu_improvement:.1f}%[/green]" if cpu_improvement > 0 else f"[red]↑ {abs(cpu_improvement):.1f}%[/red]"
-        )
+        table = Table(show_header=True, header_style="bold magenta", box=box.ROUNDED, padding=(0, 1))
+        table.add_column("Metric", style="cyan", width=18)
+        table.add_column("Baseline", justify="right", style="white", width=12)
+        table.add_column("Optimized", justify="right", style="green", width=12)
+        table.add_column("Δ Change", justify="right", width=12)
         
-        # CPU Variance
-        table.add_row(
-            "CPU Variance",
-            f"{self.baseline_avg['variance']:.1f}%",
-            f"{self.optimized_avg['variance']:.1f}%",
-            f"[green]↓ {variance_improvement:.1f}%[/green]" if variance_improvement > 0 else f"[red]↑ {abs(variance_improvement):.1f}%[/red]"
-        )
+        def fmt(v):
+            if abs(v) < 0.1:
+                return f"[dim]~0.0%[/dim]"
+            return f"[bold green]↓ {v:.1f}%[/bold green]" if v > 0 else f"[bold red]↑ {abs(v):.1f}%[/bold red]"
         
-        # Context Switches
-        table.add_row(
-            "Context Switches/s",
-            f"{self.baseline_avg['switches']:.0f}",
-            f"{self.optimized_avg['switches']:.0f}",
-            f"[green]↓ {switches_improvement:.1f}%[/green]" if switches_improvement > 0 else f"[red]↑ {abs(switches_improvement):.1f}%[/red]"
-        )
+        table.add_row("CPU Usage", f"{b_cpu:.1f}%", f"{o_cpu:.1f}%", fmt(cpu_imp))
+        table.add_row("CPU Variance", f"{b_var:.1f}%", f"{o_var:.1f}%", fmt(var_imp))
+        table.add_row("Ctx Switches/s", f"{b_switch:.0f}", f"{o_switch:.0f}", fmt(switch_imp))
+        table.add_row("Load Average", f"{b_load:.2f}", f"{o_load:.2f}", fmt(load_imp))
         
-        # Load Average
-        table.add_row(
-            "Load Average",
-            f"{self.baseline_avg['load']:.2f}",
-            f"{self.optimized_avg['load']:.2f}",
-            f"[green]↓ {load_improvement:.1f}%[/green]" if load_improvement > 0 else f"[red]↑ {abs(load_improvement):.1f}%[/red]"
-        )
+        avg_imp = (cpu_imp + var_imp + switch_imp + load_imp) / 4
+        summary = Text()
+        summary.append("\nOverall: ", style="dim")
+        summary.append(f"{avg_imp:.1f}%", style="bold green" if avg_imp > 0 else "bold red")
         
-        return Panel(
-            table,
-            title="[bold cyan]Performance Improvements[/bold cyan]",
-            border_style="cyan",
-            padding=(1, 2)
-        )
+        content = Table.grid()
+        content.add_row(table)
+        content.add_row(summary)
+        
+        return Panel(content, title=f"[bold cyan]Improvements[/bold cyan] [dim](n={len(self.optimized_stats['cpu'])})[/dim]", border_style="cyan")
     
     def create_training_panel(self):
-        """Show DQN training progress"""
+        """Training progress"""
         grid = Table.grid(padding=1)
+        grid.add_column(justify="left", width=18)
         grid.add_column(justify="left")
-        grid.add_column(justify="left")
         
-        # Episode
-        grid.add_row(
-            Text("Episodes:", style="cyan"),
-            Text(f"{self.episode:,}", style="bold white")
-        )
+        grid.add_row(Text("Episodes:", style="cyan"), Text(f"{self.episode:,}", style="bold white"))
         
-        # Epsilon
-        epsilon_bar = "█" * int(self.epsilon * 20) + "░" * (20 - int(self.epsilon * 20))
-        grid.add_row(
-            Text("Exploration (ε):", style="cyan"),
-            Text(f"{epsilon_bar} {self.epsilon:.3f}", style="yellow")
-        )
+        eps_pct = int(self.epsilon * 20)
+        eps_bar = "█" * eps_pct + "░" * (20 - eps_pct)
+        grid.add_row(Text("Exploration (ε):", style="cyan"), Text(f"{eps_bar} {self.epsilon:.3f}", style="yellow"))
         
-        # Average Reward
-        grid.add_row(
-            Text("Avg Reward:", style="cyan"),
-            Text(f"{self.avg_reward:+.2f}", style="bold green" if self.avg_reward > 0 else "bold red")
-        )
+        r_style = "bold green" if self.avg_reward > 0 else "bold red" if self.avg_reward < 0 else "white"
+        grid.add_row(Text("Avg Reward:", style="cyan"), Text(f"{self.avg_reward:+.2f}", style=r_style))
+        grid.add_row(Text("Q-Value:", style="cyan"), Text(f"{self.q_value:.1f}", style="bold magenta"))
         
-        # Q-Value
-        grid.add_row(
-            Text("Q-Value:", style="cyan"),
-            Text(f"{self.q_value:.1f}", style="bold magenta")
-        )
-        
-        return Panel(
-            grid,
-            title="[bold yellow]Training Progress[/bold yellow]",
-            border_style="yellow",
-            padding=(1, 2)
-        )
+        return Panel(grid, title="[bold yellow]Training[/bold yellow]", border_style="yellow")
     
-    def create_cpu_chart(self):
-        """Create ASCII CPU usage chart"""
-        if len(self.cpu_history) < 2:
-            return Panel("[yellow]Collecting data...[/yellow]", title="CPU Usage History")
+    def create_realtime_graph(self):
+        """Real-time ASCII graph"""
+        if len(self.cpu_baseline_history) < 2 and len(self.cpu_optimized_history) < 2:
+            return Panel(Text("⏳ Collecting graph data...", style="yellow"), title="[bold blue]CPU Usage[/bold blue]", border_style="blue")
         
-        chart_height = 10
-        chart_width = 50
+        h = 12
+        w = 50
         
-        # Get data points
-        baseline_points = [p['cpu'] for p in self.cpu_history if p['mode'] == 'baseline']
-        optimized_points = [p['cpu'] for p in self.cpu_history if p['mode'] == 'rl']
+        all_data = list(self.cpu_baseline_history) + list(self.cpu_optimized_history)
+        if not all_data:
+            return Panel(Text("No data", style="dim"), title="CPU")
         
-        if not baseline_points or not optimized_points:
-            return Panel("[yellow]Waiting for both baseline and optimized data...[/yellow]", title="CPU Usage History")
-        
-        max_val = max(max(baseline_points), max(optimized_points))
-        min_val = min(min(baseline_points), min(optimized_points))
+        max_val = max(all_data)
+        min_val = min(all_data)
+        rng = max_val - min_val if max_val != min_val else 1
         
         # Create chart
-        chart_lines = []
-        for i in range(chart_height):
-            line = ""
-            threshold = max_val - (i * (max_val - min_val) / chart_height)
+        chart = []
+        for i in range(h):
+            thresh = max_val - (i * rng / h)
+            line = Text()
             
-            for j in range(min(chart_width, len(baseline_points))):
-                if j < len(baseline_points):
-                    if baseline_points[j] >= threshold:
-                        line += "▓"
-                    else:
-                        line += " "
-            
-            chart_lines.append(line)
-        
-        # Add labels
-        chart_text = Text()
-        chart_text.append(f"{max_val:.0f}% ", style="dim")
-        chart_text.append("┐\n", style="dim")
-        
-        for i, line in enumerate(chart_lines):
-            if i == chart_height // 2:
-                chart_text.append(f"{(max_val + min_val)/2:.0f}% ", style="dim")
+            # Y-axis
+            if i == 0:
+                line.append(f"{max_val:5.1f}% ", style="dim")
+            elif i == h - 1:
+                line.append(f"{min_val:5.1f}% ", style="dim")
+            elif i == h // 2:
+                line.append(f"{(max_val+min_val)/2:5.1f}% ", style="dim")
             else:
-                chart_text.append("      ")
-            chart_text.append("│", style="dim")
-            chart_text.append(line, style="cyan")
-            chart_text.append("\n")
+                line.append("       ")
+            
+            line.append("│", style="dim")
+            
+            # Baseline dots
+            for j, val in enumerate(self.cpu_baseline_history):
+                if j >= w:
+                    break
+                if abs(val - thresh) < (rng / h):
+                    line.append("·", style="white")
+                else:
+                    line.append(" ")
+            
+            chart.append(line)
         
-        chart_text.append(f"{min_val:.0f}% ", style="dim")
-        chart_text.append("└" + "─" * chart_width + ">\n", style="dim")
-        chart_text.append("      ", style="dim")
-        chart_text.append(f"Last {len(baseline_points)} samples", style="dim italic")
+        # Overlay optimized
+        for i in range(h):
+            thresh = max_val - (i * rng / h)
+            offset = max(0, len(self.cpu_baseline_history) - len(self.cpu_optimized_history))
+            
+            for j, val in enumerate(self.cpu_optimized_history):
+                if j >= w:
+                    break
+                pos = 8 + offset + j
+                
+                if abs(val - thresh) < (rng / h):
+                    old = chart[i].plain
+                    if pos < len(old):
+                        new = old[:pos] + "█" + old[pos+1:]
+                        chart[i] = Text()
+                        chart[i].append(new[:pos], style="dim")
+                        chart[i].append("█", style="bold cyan")
+                        chart[i].append(new[pos+1:], style="white")
         
-        return Panel(
-            chart_text,
-            title="[bold blue]CPU Usage Over Time[/bold blue]",
-            border_style="blue",
-            padding=(1, 2)
-        )
+        result = Text()
+        for line in chart:
+            result.append(line)
+            result.append("\n")
+        result.append(f"       └{'─'*w}>\n", style="dim")
+        
+        legend = Text()
+        legend.append("  ·  ", style="white")
+        legend.append("Baseline  ", style="dim")
+        legend.append("█  ", style="bold cyan")
+        legend.append("Optimized", style="cyan")
+        result.append(legend)
+        
+        return Panel(result, title="[bold blue]CPU - Real-time[/bold blue]", border_style="blue")
+    
+    def create_reward_graph(self):
+        """Reward trend"""
+        if len(self.reward_history) < 2:
+            return Panel(Text("⏳ Waiting for training...", style="yellow"), title="[bold green]Rewards[/bold green]", border_style="green")
+        
+        h = 8
+        w = 40
+        
+        max_val = max(self.reward_history)
+        min_val = min(self.reward_history)
+        rng = max_val - min_val if max_val != min_val else 1
+        
+        chart = []
+        for i in range(h):
+            thresh = max_val - (i * rng / h)
+            line = Text()
+            
+            if i == 0:
+                line.append(f"{max_val:6.1f} ", style="dim")
+            elif i == h - 1:
+                line.append(f"{min_val:6.1f} ", style="dim")
+            else:
+                line.append("        ")
+            
+            line.append("│", style="dim")
+            
+            for j, val in enumerate(self.reward_history):
+                if j >= w:
+                    break
+                if abs(val - thresh) < (rng / h):
+                    line.append("●", style="bold green")
+                else:
+                    line.append(" ")
+            
+            chart.append(line)
+        
+        result = Text()
+        for line in chart:
+            result.append(line)
+            result.append("\n")
+        result.append(f"        └{'─'*w}>\n", style="dim")
+        
+        return Panel(result, title="[bold green]Reward Trend[/bold green]", border_style="green")
     
     def create_process_panel(self):
-        """Show optimized processes"""
-        if not self.process_stats:
-            return Panel("[yellow]No process data available[/yellow]", title="Optimized Processes")
+        """Show processes"""
+        if not self.processes:
+            return Panel(Text("⏳ No process data", style="yellow"), title="[bold green]Processes[/bold green]", border_style="green")
         
-        table = Table(show_header=True, header_style="bold cyan", box=box.SIMPLE)
-        table.add_column("PID", style="yellow", width=8)
-        table.add_column("Process", style="cyan", width=20)
-        table.add_column("Type", style="magenta", width=15)
-        table.add_column("CPU %", justify="right", style="green")
-        table.add_column("Priority", justify="right", style="blue")
+        table = Table(show_header=True, header_style="bold cyan", box=box.SIMPLE, padding=(0, 1))
+        table.add_column("PID", style="yellow", width=7)
+        table.add_column("Process", style="cyan", width=16)
+        table.add_column("Type", style="magenta", width=14)
+        table.add_column("CPU%", justify="right", width=8)
+        table.add_column("Nice", justify="right", width=5)
         
-        for pid, proc in sorted(self.process_stats.items(), key=lambda x: x[1].get('cpu_usage', 0), reverse=True)[:8]:
-            cpu = proc.get('cpu_usage', 0)
-            cpu_style = "bold red" if cpu > 80 else "bold yellow" if cpu > 50 else "green"
+        for pid, proc in sorted(self.processes.items(), key=lambda x: x[1].get('cpu', 0), reverse=True)[:10]:
+            cpu = proc.get('cpu', 0)
+            style = "bold red" if cpu > 70 else "bold yellow" if cpu > 40 else "green"
             
             table.add_row(
                 str(pid),
-                proc.get('name', 'unknown')[:20],
-                proc.get('type', 'unknown'),
-                f"[{cpu_style}]{cpu:.1f}%[/{cpu_style}]",
+                proc.get('name', 'unknown')[:16],
+                proc.get('type', 'unknown')[:14],
+                f"[{style}]{cpu:.1f}%[/{style}]",
                 str(proc.get('nice', 0))
             )
         
-        return Panel(
-            table,
-            title="[bold green]Active Processes Being Optimized[/bold green]",
-            border_style="green",
-            padding=(1, 2)
-        )
+        return Panel(table, title=f"[bold green]Processes[/bold green] [dim]({len(self.processes)})[/dim]", border_style="green")
     
     def create_action_log(self):
-        """Show recent scheduler actions"""
-        actions = self.read_actions()
-        
-        if not actions:
-            return Panel("[yellow]No actions recorded yet[/yellow]", title="Recent Actions")
+        """Action log"""
+        if not self.actions:
+            return Panel(Text("⏳ No actions yet", style="yellow"), title="[bold magenta]Actions[/bold magenta]", border_style="magenta")
         
         text = Text()
-        for action in actions[-8:]:
-            # Parse timestamp and action
+        for action in list(self.actions)[-10:]:
             parts = action.split(' - ', 1)
             if len(parts) == 2:
-                timestamp, action_text = parts
-                text.append(f"[{timestamp}] ", style="dim cyan")
-                text.append(f"{action_text}\n", style="white")
+                ts, txt = parts
+                text.append(f"[{ts}] ", style="dim cyan")
+                text.append(f"{txt}\n", style="white")
             else:
-                text.append(f"{action}\n", style="white")
+                text.append(f"• {action}\n", style="white")
         
-        return Panel(
-            text,
-            title="[bold magenta]Scheduler Actions Log[/bold magenta]",
-            border_style="magenta",
-            padding=(1, 2)
-        )
+        return Panel(text, title="[bold magenta]Recent Actions[/bold magenta]", border_style="magenta")
+    
+    def create_footer(self):
+        """Footer"""
+        runtime = int(time.time() - self.start_time)
+        
+        footer = Text()
+        footer.append("Press ", style="dim")
+        footer.append("Ctrl+C", style="bold red")
+        footer.append(" to exit  │  Runtime: ", style="dim")
+        footer.append(f"{runtime}s", style="cyan")
+        footer.append("  │  ", style="dim")
+        footer.append(datetime.now().strftime("%H:%M:%S"), style="cyan")
+        
+        if not self.rl_start and self.baseline_start:
+            bt = int(time.time() - self.baseline_start)
+            footer.append(f"  │  Baseline ETA: {max(0, 60-bt)}s", style="yellow")
+        
+        return Panel(footer, border_style="dim")
     
     def create_layout(self):
-        """Create the dashboard layout"""
+        """Layout"""
         layout = Layout()
         
         layout.split_column(
@@ -385,17 +491,18 @@ class EnhancedDashboard:
         )
         
         layout["main"].split_row(
-            Layout(name="left"),
-            Layout(name="right")
+            Layout(name="left", ratio=3),
+            Layout(name="right", ratio=2)
         )
         
         layout["left"].split_column(
-            Layout(name="improvements", size=12),
-            Layout(name="training", size=10),
-            Layout(name="chart")
+            Layout(name="improvements", size=14),
+            Layout(name="graph", size=20),
+            Layout(name="training", size=12)
         )
         
         layout["right"].split_column(
+            Layout(name="reward", size=16),
             Layout(name="processes"),
             Layout(name="actions")
         )
@@ -403,47 +510,46 @@ class EnhancedDashboard:
         return layout
     
     def update_layout(self, layout):
-        """Update all panels"""
-        # Read latest data
-        self.read_metrics()
-        self.read_state()
+        """Update"""
+        self.read_metrics_fast()
+        self.read_state_fast()
+        self.read_actions_fast()
         
-        # Update panels
         layout["header"].update(self.create_header())
         layout["improvements"].update(self.create_improvement_panel())
+        layout["graph"].update(self.create_realtime_graph())
         layout["training"].update(self.create_training_panel())
-        layout["chart"].update(self.create_cpu_chart())
+        layout["reward"].update(self.create_reward_graph())
         layout["processes"].update(self.create_process_panel())
         layout["actions"].update(self.create_action_log())
-        
-        # Footer
-        footer_text = Text()
-        footer_text.append("Press ", style="dim")
-        footer_text.append("Ctrl+C", style="bold red")
-        footer_text.append(" to exit | Refreshing every 2 seconds | ", style="dim")
-        footer_text.append(datetime.now().strftime("%Y-%m-%d %H:%M:%S"), style="cyan")
-        
-        layout["footer"].update(Panel(Align.center(footer_text), border_style="dim"))
+        layout["footer"].update(self.create_footer())
     
     def run(self):
-        """Run the dashboard"""
+        """Run"""
         layout = self.create_layout()
         
+        console.print("\n[bold cyan]🚀 Starting Dashboard...[/bold cyan]")
+        console.print("[dim]Waiting for DQN optimizer data...[/dim]\n")
+        time.sleep(1)
+        
         try:
-            with Live(layout, refresh_per_second=0.5, screen=True) as live:
+            with Live(layout, refresh_per_second=2, screen=True) as live:
                 while True:
                     self.update_layout(layout)
-                    time.sleep(2)
+                    time.sleep(1)
         except KeyboardInterrupt:
-            console.print("\n[yellow]Dashboard stopped by user[/yellow]")
+            console.print("\n\n[yellow]Dashboard stopped[/yellow]")
+            console.print("[green]✓ Clean exit[/green]\n")
 
 if __name__ == "__main__":
-    console.print("[bold cyan]Starting Enhanced Terminal Dashboard...[/bold cyan]\n")
+    console.print("\n[bold cyan]═══════════════════════════════════════════════════[/bold cyan]")
+    console.print("[bold cyan]   DQN CPU SCHEDULER - Enhanced Dashboard[/bold cyan]")
+    console.print("[bold cyan]═══════════════════════════════════════════════════[/bold cyan]\n")
+    console.print("[bold yellow]TIMING EXPECTATIONS:[/bold yellow]")
+    console.print("  • 0-60s: Baseline collection")
+    console.print("  • 60s+: Training starts")
+    console.print("  • 90-120s: First improvements visible")
+    console.print("  • 3-5 min: Stable improvements\n")
     
-    # Check if data files exist
-    if not os.path.exists('/tmp/scheduler_metrics.csv'):
-        console.print("[yellow]Warning: /tmp/scheduler_metrics.csv not found[/yellow]")
-        console.print("[yellow]Make sure the DQN optimizer is running![/yellow]\n")
-    
-    dashboard = EnhancedDashboard()
+    dashboard = OptimizedDashboard()
     dashboard.run()
