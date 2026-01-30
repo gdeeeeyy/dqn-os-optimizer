@@ -251,9 +251,9 @@ impl Monitor {
     }
 
     fn run(&mut self) {
-        println!("\n============================================================");
+        println!("\n{}", "=".repeat(60));
         println!("CPU SCHEDULER MONITOR - STARTING");
-        println!("============================================================");
+        println!("{}", "=".repeat(60));
         println!("[Rust Monitor] Metrics file: {}", METRICS_FILE);
         println!(
             "[Rust Monitor] Baseline duration: {}s",
