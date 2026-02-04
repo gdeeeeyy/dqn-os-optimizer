@@ -40,7 +40,7 @@ Let me stop yapping and scroll down to see what this project is and how to run i
 
 ---
 
-## 🎮 How It Works (The Simple Version)
+## How It Works (The Simple Version)
 
 ```
 1. Rust monitor: "Hey, CPU is doing this thing..."
@@ -52,7 +52,7 @@ Let me stop yapping and scroll down to see what this project is and how to run i
 
 ---
 
-## 🚀 Getting Started (The Easy Way)
+## Getting Started (The Easy Way)
 
 ### Prerequisites
 
@@ -108,7 +108,7 @@ This will:
 
 ---
 
-## 🎯 The Architecture (For the Nerds)
+## The Architecture (For the Nerds)
 
 ```
 ┌─────────────────────────────────────────────┐
@@ -135,7 +135,7 @@ This will:
 
 ---
 
-## 🛠️ What Can Go Wrong (And How to Fix It)
+## What Can Go Wrong (And How to Fix It)
 
 ### "CPU usage shows 0.0%"
 
@@ -163,7 +163,7 @@ chmod +x run.sh
 
 ---
 
-## 🔮 The Future (aka The Dream)
+## The Future (aka The Dream)
 
 This is just the beginning. Sure, it might seem like "just" a user-space scheduler optimizer right now, but here's the vision:
 
@@ -187,15 +187,15 @@ This is just the beginning. Sure, it might seem like "just" a user-space schedul
 
 ---
 
-## 🎓 What This Actually Is
+## What This Actually Is
 
 Look, I'm not going to claim this replaces CFS or makes Linux 500% faster. But it's:
 
-✅ A **learning tool** to understand CPU scheduling + AI  
-✅ A **proof of concept** that RL can optimize OS behavior  
-✅ A **safe playground** for experimenting without kernel crashes  
-✅ A **foundation** for more ambitious projects  
-✅ **Something I'm genuinely proud of** 😊
+- A **learning tool** to understand CPU scheduling + AI
+- A **proof of concept** that RL can optimize OS behavior
+- A **safe playground** for experimenting without kernel crashes
+- A **foundation** for more ambitious projects
+- **Something I'm genuinely proud of** 😊
 
 Can it be used as a base-level learning tool to traverse the CPU scheduling + AI road? Absolutely. Is it production-ready? God no. But that's not the point, is it?
 
@@ -205,7 +205,7 @@ Can it be used as a base-level learning tool to traverse the CPU scheduling + AI
 
 **Massive thanks to:**
 
-- **Priyanka** for trusting me with our final-year project and sitting through all my "I think I know what's wrong" moments (spoiler: I usually didn't)
+- **Priyanka** for trusting me with our final-year project and sitting through all my maldings.
 - **ChatGPT** (at times) for being my trusted 'fiend' always
 - **The Linux community** for making `/proc` wonderful
 - **Everyone who actually read this README** thanks for giving me the attention
@@ -218,7 +218,7 @@ MIT License (because sharing is caring)
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 Found a bug? Have an idea? Want to make this even cooler? PRs are welcome! Just remember:
 
@@ -228,7 +228,7 @@ Found a bug? Have an idea? Want to make this even cooler? PRs are welcome! Just 
 
 ---
 
-## 💬 Final Thoughts
+## Final Thoughts
 
 Sure, this might not seem like a lot compared to building a full OS from scratch. But it's _my_ Jugaad, and I'm proud of it. It's a stepping stone on a much longer journey.
 
