@@ -16,8 +16,6 @@ Let me stop yapping and scroll down to see what this project is and how to run i
 
 ---
 
----
-
 ## Tech Stack
 
 ### The Languages
