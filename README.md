@@ -18,20 +18,20 @@ Let me stop yapping and scroll down to see what this project is and how to run i
 
 ## Tech Stack
 
-### The Languages
+### The Languages Used
 
 - **Rust**
 - **Python**
 - **Shell**
 
-### The ML Magic
+### Reinforcement Learning Behind it
 
 - Deep Q-Network (DQN) with experience replay
 - ε-greedy exploration (sometimes you gotta try random stuff)
 - Reward shaping that actually makes sense
 - Baseline comparison mode (to prove we're not making things worse)
 
-### The System Wizardry
+### What the System does
 
 - `/proc/stat` and `/proc/loadavg` for metrics
 - `nice` and `chrt` for priority control
@@ -139,14 +139,14 @@ This will:
 
 ### "CPU usage shows 0.0%"
 
-Your system is too chill. Generate some load:
+Your system needs some load. Generate some using:
 
 ```bash
 python3 -c "while True: pass" &
 # Don't forget to kill it later!
 ```
 
-### "Permission denied everywhere"
+### "Sudo for perms"
 
 ```bash
 sudo rm -f /tmp/scheduler_*
@@ -154,7 +154,7 @@ chmod +x run.sh
 ./run.sh setup
 ```
 
-### "Where's my Rust binary?"
+### "Set it all up"
 
 ```bash
 ./run.sh setup
@@ -235,8 +235,6 @@ Sure, this might not seem like a lot compared to building a full OS from scratch
 The road ahead is long – kernel integration, GPU scheduling, distro packaging – but I'm ready to walk it. One commit at a time.
 
 **TL;DR:** I wanted to build an OS, settled for making a smart CPU scheduler using deep learning, and ended up learning a ton about both systems programming and AI. Not bad for a Jugaad project.
-
-Now if you'll excuse me, I need to go explain to my laptop why I keep making it reschedule processes randomly.
 
 ---
 
